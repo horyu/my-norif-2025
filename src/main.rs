@@ -16,7 +16,7 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
         while WindowsAndMessaging::GetMessageW(&mut message, None, 0, 0).as_bool() {
             // Menu は1アイテムのみであるため、選択イベントが発生したら終了する
             if menu_event_receiver.try_recv().is_ok() {
-                return Ok(());
+                WindowsAndMessaging::PostQuitMessage(0);
             }
             WindowsAndMessaging::DispatchMessageW(&message);
         }
