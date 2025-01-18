@@ -4,3 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+tray-icon = "0.19.2"
+
+[dependencies.windows]
+version = "0.59"
+features = [
+    "Win32_UI_WindowsAndMessaging",
+]
