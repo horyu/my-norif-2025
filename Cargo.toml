@@ -11,3 +11,6 @@ version = "0.59"
 features = [
     "Win32_UI_WindowsAndMessaging",
 ]
+
+[build-dependencies]
+image = "0.25.5"

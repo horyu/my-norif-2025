@@ -1,3 +1,5 @@
+mod icon_data;
+
 fn main() {
     if let Err(err) = try_main() {
         eprintln!("Error: {err:#?}",);
@@ -32,12 +34,17 @@ fn create_tray_icon() -> Result<tray_icon::TrayIcon, Box<dyn std::error::Error>>
     };
 
     let menu = Menu::with_items(&[&MenuItem::new("Exit", true, None)])?;
+    let icon = Icon::from_rgba(
+        icon_data::ICON_RGBA.to_vec(),
+        icon_data::ICON_WIDTH,
+        icon_data::ICON_HEIGHT,
+    )?;
 
     TrayIconBuilder::new()
         .with_tooltip("[tooltip]\nTray Icon")
         .with_menu_on_left_click(true)
         .with_menu(Box::new(menu))
-        .with_icon(Icon::from_rgba(vec![0xFF, 0xFF, 0x00, 0x00], 1, 1).unwrap())
+        .with_icon(icon)
         .build()
         .map_err(Into::into)
 }
