@@ -2,7 +2,7 @@ mod icon_data;
 
 fn main() {
     if let Err(err) = try_main() {
-        eprintln!("Error: {err:#?}",);
+        dbg!(err);
         std::process::exit(1);
     }
 }
@@ -11,6 +11,9 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     use windows::Win32::UI::WindowsAndMessaging;
 
     let _tray_icon = create_tray_icon()?;
+
+    let server = std::net::TcpListener::bind("127.0.0.1:45654")?;
+    std::thread::spawn(|| handle_server(server));
 
     let menu_event_receiver = tray_icon::menu::MenuEvent::receiver();
     let mut message = WindowsAndMessaging::MSG::default();
@@ -25,6 +28,30 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+fn handle_server(server: std::net::TcpListener) {
+    use std::io::Read;
+    dbg!("Server started");
+    let mut buffer = [0; 1024];
+    for stream in server.incoming() {
+        match stream {
+            Ok(mut stream) => {
+                // 通知領域に限界があるため、読み込みきれなくても無視する
+                let _ = stream
+                    .read(&mut buffer)
+                    .expect("Failed to read from stream");
+                let message =
+                    std::str::from_utf8(&buffer).expect("Failed to convert buffer to string");
+                println!("Received: {message}");
+            }
+            Err(err) => {
+                dbg!(err);
+            }
+        }
+        dbg!("Connection closed");
+    }
+    dbg!("Server stopped");
 }
 
 fn create_tray_icon() -> Result<tray_icon::TrayIcon, Box<dyn std::error::Error>> {
