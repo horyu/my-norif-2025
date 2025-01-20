@@ -41,17 +41,41 @@ fn handle_server(server: std::net::TcpListener) {
                 let _ = stream
                     .read(&mut buffer)
                     .expect("Failed to read from stream");
-                let message =
-                    std::str::from_utf8(&buffer).expect("Failed to convert buffer to string");
-                println!("Received: {message}");
             }
             Err(err) => {
                 dbg!(err);
+                continue;
             }
         }
+        let message = std::str::from_utf8(&buffer).expect("Failed to convert buffer to string");
+        show_notification(message);
+
         dbg!("Connection closed");
     }
     dbg!("Server stopped");
+}
+
+fn show_notification(message: &str) {
+    use winrt_toast::{Scenario, Toast, ToastManager,};
+
+    // PowerShell を利用すると、Toastをクリックしてもウィンドウが開かれない
+    let manager = ToastManager::new(r#"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"#);
+    let mut toast = Toast::new();
+    toast.scenario(Scenario::Reminder);
+
+    let mut line_iter = message.lines();
+    if let Some(text1) = line_iter.next() {
+        toast.text1(text1);
+        if let Some(text2) = line_iter.next() {
+            toast.text2(text2);
+            if let Some(text3) = line_iter.next() {
+                toast.text3(text3);
+                // 4行目以降は無視する
+            }
+        }
+    }
+
+    manager.show(&toast).expect("Failed to show toast");
 }
 
 fn create_tray_icon() -> Result<tray_icon::TrayIcon, Box<dyn std::error::Error>> {
