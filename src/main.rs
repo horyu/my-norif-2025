@@ -1,5 +1,11 @@
 mod icon_data;
 
+#[derive(Debug)]
+struct MyMenuId {
+    test_notification: String,
+    exit: String,
+}
+
 fn main() {
     if let Err(err) = try_main() {
         dbg!(err);
@@ -14,7 +20,7 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     let port = get_port()?;
     dbg!(local_ip_address, port);
 
-    let _tray_icon = create_tray_icon(local_ip_address, port)?;
+    let (_tray_icon, my_menu_id) = create_tray_icon(local_ip_address, port)?;
 
     let server = std::net::TcpListener::bind((local_ip_address, port))?;
     std::thread::spawn(|| handle_server(server));
@@ -23,9 +29,16 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     let menu_event_receiver = tray_icon::menu::MenuEvent::receiver();
     unsafe {
         while WindowsAndMessaging::GetMessageW(&mut message, None, 0, 0).as_bool() {
-            // Menu は Exit のみであるため、MenuEvent が発生したら終了する
-            if menu_event_receiver.try_recv().is_ok() {
-                WindowsAndMessaging::PostQuitMessage(0);
+            if let Ok(event) = menu_event_receiver.try_recv() {
+                match event.id {
+                    id if id == my_menu_id.test_notification => {
+                        show_notification("Test Notification\nThis is a test message.")
+                    }
+                    id if id == my_menu_id.exit => WindowsAndMessaging::PostQuitMessage(0),
+                    _ => {
+                        dbg!("Unknown menu event", event);
+                    }
+                }
             }
             WindowsAndMessaging::DispatchMessageW(&message);
         }
@@ -107,24 +120,33 @@ fn get_port() -> Result<u16, Box<dyn std::error::Error>> {
 fn create_tray_icon(
     ip: std::net::IpAddr,
     port: u16,
-) -> Result<tray_icon::TrayIcon, Box<dyn std::error::Error>> {
+) -> Result<(tray_icon::TrayIcon, MyMenuId), Box<dyn std::error::Error>> {
     use tray_icon::{
         Icon, TrayIconBuilder,
         menu::{Menu, MenuItem},
     };
 
-    let menu = Menu::with_items(&[&MenuItem::new("Exit", true, None)])?;
+    let test_notification = MenuItem::new("Test Notification", true, None);
+    let exit = MenuItem::new("Exit", true, None);
+    let menu = Menu::with_items(&[&test_notification, &exit])?;
+
+    let menu_id = MyMenuId {
+        test_notification: test_notification.id().0.to_owned(),
+        exit: exit.id().0.to_owned(),
+    };
+
     let icon = Icon::from_rgba(
         icon_data::ICON_RGBA.to_vec(),
         icon_data::ICON_WIDTH,
         icon_data::ICON_HEIGHT,
     )?;
 
-    TrayIconBuilder::new()
+    let tray_icon = TrayIconBuilder::new()
         .with_tooltip(format!("My Notif\nIP: {ip}\nPort: {port}"))
         .with_menu_on_left_click(true)
         .with_menu(Box::new(menu))
         .with_icon(icon)
-        .build()
-        .map_err(Into::into)
+        .build()?;
+
+    Ok((tray_icon, menu_id))
 }
