@@ -10,11 +10,11 @@ fn main() {
 fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     use windows::Win32::UI::WindowsAndMessaging;
 
-    let _tray_icon = create_tray_icon()?;
-
     let local_ip_address = local_ip_address::local_ip()?;
     let port = get_port()?;
     dbg!(local_ip_address, port);
+
+    let _tray_icon = create_tray_icon(local_ip_address, port)?;
 
     let server = std::net::TcpListener::bind((local_ip_address, port))?;
     std::thread::spawn(|| handle_server(server));
@@ -104,7 +104,10 @@ fn get_port() -> Result<u16, Box<dyn std::error::Error>> {
         .map_or_else(|| Ok(45654), |s| s.parse().map_err(Into::into))
 }
 
-fn create_tray_icon() -> Result<tray_icon::TrayIcon, Box<dyn std::error::Error>> {
+fn create_tray_icon(
+    ip: std::net::IpAddr,
+    port: u16,
+) -> Result<tray_icon::TrayIcon, Box<dyn std::error::Error>> {
     use tray_icon::{
         Icon, TrayIconBuilder,
         menu::{Menu, MenuItem},
@@ -118,7 +121,7 @@ fn create_tray_icon() -> Result<tray_icon::TrayIcon, Box<dyn std::error::Error>>
     )?;
 
     TrayIconBuilder::new()
-        .with_tooltip("[tooltip]\nTray Icon")
+        .with_tooltip(format!("My Notif\nIP: {ip}\nPort: {port}"))
         .with_menu_on_left_click(true)
         .with_menu(Box::new(menu))
         .with_icon(icon)
