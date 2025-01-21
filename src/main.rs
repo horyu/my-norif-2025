@@ -12,7 +12,10 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _tray_icon = create_tray_icon()?;
 
-    let server = std::net::TcpListener::bind("127.0.0.1:45654")?;
+    let local_ip_address = local_ip_address::local_ip()?;
+    dbg!(local_ip_address);
+
+    let server = std::net::TcpListener::bind((local_ip_address, 45654))?;
     std::thread::spawn(|| handle_server(server));
 
     let mut message = WindowsAndMessaging::MSG::default();
@@ -67,10 +70,12 @@ fn handle_server(server: std::net::TcpListener) {
 }
 
 fn show_notification(message: &str) {
-    use winrt_toast::{Scenario, Toast, ToastManager,};
+    use winrt_toast::{Scenario, Toast, ToastManager};
 
     // applicationid に PowerShell を指定すると、Toastをクリックしてもウィンドウが開かれない
-    let manager = ToastManager::new(r#"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"#);
+    let manager = ToastManager::new(
+        r#"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"#,
+    );
     let mut toast = Toast::new();
     toast.scenario(Scenario::Reminder);
 
