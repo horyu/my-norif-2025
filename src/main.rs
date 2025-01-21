@@ -33,13 +33,21 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
 fn handle_server(server: std::net::TcpListener) {
     use std::io::Read;
     dbg!("Server started");
-    let mut buffer = [0; 1024];
     for stream in server.incoming() {
+        let mut buffer = [0; 1024];
         match stream {
             Ok(mut stream) => {
                 // 通知領域に限界があるため、読み込みきれなくても無視する
                 let _ = stream
                     .read(&mut buffer)
+                    // 途中で切断された場合はエラーとして扱わない
+                    .or_else(|err| {
+                        if err.kind() == std::io::ErrorKind::UnexpectedEof {
+                            Ok(0)
+                        } else {
+                            Err(err)
+                        }
+                    })
                     .expect("Failed to read from stream");
             }
             Err(err) => {
@@ -47,7 +55,10 @@ fn handle_server(server: std::net::TcpListener) {
                 continue;
             }
         }
-        let message = std::str::from_utf8(&buffer).expect("Failed to convert buffer to string");
+        let message = std::str::from_utf8(&buffer)
+            .expect("Failed to convert buffer to string")
+            .trim_end_matches('\0')
+            .trim_end();
         show_notification(message);
 
         dbg!("Connection closed");
