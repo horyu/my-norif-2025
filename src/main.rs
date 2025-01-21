@@ -13,9 +13,10 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     let _tray_icon = create_tray_icon()?;
 
     let local_ip_address = local_ip_address::local_ip()?;
-    dbg!(local_ip_address);
+    let port = get_port()?;
+    dbg!(local_ip_address, port);
 
-    let server = std::net::TcpListener::bind((local_ip_address, 45654))?;
+    let server = std::net::TcpListener::bind((local_ip_address, port))?;
     std::thread::spawn(|| handle_server(server));
 
     let mut message = WindowsAndMessaging::MSG::default();
@@ -92,6 +93,15 @@ fn show_notification(message: &str) {
     }
 
     manager.show(&toast).expect("Failed to show toast");
+}
+
+fn get_port() -> Result<u16, Box<dyn std::error::Error>> {
+    use std::env;
+
+    env::args()
+        .nth(1)
+        .or_else(|| env::var("MY_NOTIF_PORT").ok())
+        .map_or_else(|| Ok(45654), |s| s.parse().map_err(Into::into))
 }
 
 fn create_tray_icon() -> Result<tray_icon::TrayIcon, Box<dyn std::error::Error>> {
