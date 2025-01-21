@@ -15,11 +15,11 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     let server = std::net::TcpListener::bind("127.0.0.1:45654")?;
     std::thread::spawn(|| handle_server(server));
 
-    let menu_event_receiver = tray_icon::menu::MenuEvent::receiver();
     let mut message = WindowsAndMessaging::MSG::default();
+    let menu_event_receiver = tray_icon::menu::MenuEvent::receiver();
     unsafe {
         while WindowsAndMessaging::GetMessageW(&mut message, None, 0, 0).as_bool() {
-            // Menu は1アイテムのみであるため、選択イベントが発生したら終了する
+            // Menu は Exit のみであるため、MenuEvent が発生したら終了する
             if menu_event_receiver.try_recv().is_ok() {
                 WindowsAndMessaging::PostQuitMessage(0);
             }
@@ -58,7 +58,7 @@ fn handle_server(server: std::net::TcpListener) {
 fn show_notification(message: &str) {
     use winrt_toast::{Scenario, Toast, ToastManager,};
 
-    // PowerShell を利用すると、Toastをクリックしてもウィンドウが開かれない
+    // applicationid に PowerShell を指定すると、Toastをクリックしてもウィンドウが開かれない
     let manager = ToastManager::new(r#"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"#);
     let mut toast = Toast::new();
     toast.scenario(Scenario::Reminder);
