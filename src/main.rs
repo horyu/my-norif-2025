@@ -68,20 +68,19 @@ fn handle_server(
     server: std::net::TcpListener,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use std::io::Read;
+    const MAX_NOTIFICATION_LENGTH: usize = 1024;
 
     for stream in server.incoming() {
         // 通知領域に限界があるため、読み込みきれなくても無視する
-        let mut buffer = [0; 1024];
-        let _ = stream?
-            .read(&mut buffer)
+        let mut buffer = [0; MAX_NOTIFICATION_LENGTH];
+        let _ = stream?.read(&mut buffer).or_else(|err| {
             // 途中で切断された場合はエラーとして扱わない
-            .or_else(|err| {
-                if err.kind() == std::io::ErrorKind::UnexpectedEof {
-                    Ok(0)
-                } else {
-                    Err(err)
-                }
-            })?;
+            if err.kind() == std::io::ErrorKind::UnexpectedEof {
+                Ok(0)
+            } else {
+                Err(err)
+            }
+        })?;
         let message = std::str::from_utf8(&buffer)?
             .trim_end_matches('\0')
             .trim_end();
@@ -93,11 +92,11 @@ fn handle_server(
 
 fn show_notification(message: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use winrt_toast::{Scenario, Toast, ToastManager};
+    const POWERSHELL_APP_ID: &str =
+        r#"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"#;
 
     // applicationid に PowerShell を指定すると、Toastをクリックしてもウィンドウが開かれない
-    let manager = ToastManager::new(
-        r#"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"#,
-    );
+    let manager = ToastManager::new(POWERSHELL_APP_ID);
     let mut toast = Toast::new();
     toast.scenario(Scenario::Reminder);
 
@@ -131,11 +130,12 @@ fn post_quit_message_to_thread(thread_id: u32) {
 
 fn get_port() -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {
     use std::env;
+    const DEFAULT_PORT: u16 = 45654;
 
     env::args()
         .nth(1)
         .or_else(|| env::var("MY_NOTIF_PORT").ok())
-        .map_or_else(|| Ok(45654), |s| s.parse().map_err(Into::into))
+        .map_or_else(|| Ok(DEFAULT_PORT), |s| s.parse().map_err(Into::into))
 }
 
 fn create_tray_icon(
