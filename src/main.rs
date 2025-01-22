@@ -13,7 +13,7 @@ fn main() {
     }
 }
 
-fn try_main() -> Result<(), Box<dyn std::error::Error>> {
+fn try_main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use windows::Win32::UI::WindowsAndMessaging;
 
     let local_ip_address = local_ip_address::local_ip()?;
@@ -23,7 +23,12 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     let (_tray_icon, my_menu_id) = create_tray_icon(local_ip_address, port)?;
 
     let server = std::net::TcpListener::bind((local_ip_address, port))?;
-    std::thread::spawn(|| handle_server(server));
+    let thread_id = unsafe { windows::Win32::System::Threading::GetCurrentThreadId() };
+    let join_handle = std::thread::spawn(move || {
+        let result = handle_server(server);
+        post_quit_message_to_thread(thread_id);
+        result
+    });
 
     let mut message = WindowsAndMessaging::MSG::default();
     let menu_event_receiver = tray_icon::menu::MenuEvent::receiver();
@@ -36,7 +41,7 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     id if id == my_menu_id.exit => WindowsAndMessaging::PostQuitMessage(0),
                     _ => {
-                        dbg!("Unknown menu event", event);
+                        return Err(format!("Unknown menu event: {event:#?}").into());
                     }
                 }
             }
@@ -44,43 +49,39 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    Ok(())
+    if join_handle.is_finished() {
+        join_handle.join().expect("Failed to join thread")
+    } else {
+        Ok(())
+    }
 }
 
-fn handle_server(server: std::net::TcpListener) {
+fn handle_server(
+    server: std::net::TcpListener,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use std::io::Read;
     dbg!("Server started");
     for stream in server.incoming() {
+        // 通知領域に限界があるため、読み込みきれなくても無視する
         let mut buffer = [0; 1024];
-        match stream {
-            Ok(mut stream) => {
-                // 通知領域に限界があるため、読み込みきれなくても無視する
-                let _ = stream
-                    .read(&mut buffer)
-                    // 途中で切断された場合はエラーとして扱わない
-                    .or_else(|err| {
-                        if err.kind() == std::io::ErrorKind::UnexpectedEof {
-                            Ok(0)
-                        } else {
-                            Err(err)
-                        }
-                    })
-                    .expect("Failed to read from stream");
-            }
-            Err(err) => {
-                dbg!(err);
-                continue;
-            }
-        }
-        let message = std::str::from_utf8(&buffer)
-            .expect("Failed to convert buffer to string")
+        let _ = stream?
+            .read(&mut buffer)
+            // 途中で切断された場合はエラーとして扱わない
+            .or_else(|err| {
+                if err.kind() == std::io::ErrorKind::UnexpectedEof {
+                    Ok(0)
+                } else {
+                    Err(err)
+                }
+            })?;
+        let message = std::str::from_utf8(&buffer)?
             .trim_end_matches('\0')
             .trim_end();
         show_notification(message);
-
         dbg!("Connection closed");
     }
     dbg!("Server stopped");
+    Ok(())
 }
 
 fn show_notification(message: &str) {
@@ -108,7 +109,20 @@ fn show_notification(message: &str) {
     manager.show(&toast).expect("Failed to show toast");
 }
 
-fn get_port() -> Result<u16, Box<dyn std::error::Error>> {
+fn post_quit_message_to_thread(thread_id: u32) {
+    use windows::Win32::{Foundation, UI::WindowsAndMessaging};
+
+    unsafe {
+        let _ = WindowsAndMessaging::PostThreadMessageW(
+            thread_id,
+            WindowsAndMessaging::WM_QUIT,
+            Foundation::WPARAM::default(),
+            Foundation::LPARAM::default(),
+        );
+    }
+}
+
+fn get_port() -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {
     use std::env;
 
     env::args()
@@ -120,7 +134,7 @@ fn get_port() -> Result<u16, Box<dyn std::error::Error>> {
 fn create_tray_icon(
     ip: std::net::IpAddr,
     port: u16,
-) -> Result<(tray_icon::TrayIcon, MyMenuId), Box<dyn std::error::Error>> {
+) -> Result<(tray_icon::TrayIcon, MyMenuId), Box<dyn std::error::Error + Send + Sync>> {
     use tray_icon::{
         Icon, TrayIconBuilder,
         menu::{Menu, MenuItem},

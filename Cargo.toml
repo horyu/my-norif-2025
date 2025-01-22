@@ -12,6 +12,7 @@ local-ip-address = "0.6.3"
 version = "0.59"
 features = [
     "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
 ]
 
 [build-dependencies]
