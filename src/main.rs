@@ -62,7 +62,7 @@ fn handle_server(
     server: std::net::TcpListener,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use std::io::Read;
-    dbg!("Server started");
+
     for stream in server.incoming() {
         // 通知領域に限界があるため、読み込みきれなくても無視する
         let mut buffer = [0; 1024];
@@ -80,10 +80,9 @@ fn handle_server(
             .trim_end_matches('\0')
             .trim_end();
         show_notification(message)?;
-        dbg!("Connection closed");
     }
-    dbg!("Server stopped");
-    Ok(())
+
+    Err("Server stopped.".into())
 }
 
 fn show_notification(message: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
