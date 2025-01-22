@@ -50,7 +50,9 @@ fn try_main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     if join_handle.is_finished() {
-        join_handle.join().expect("Failed to join thread")
+        join_handle
+            .join()
+            .map_err(|e| format!("Failed to join thread: {:#?}", e))?
     } else {
         Ok(())
     }
