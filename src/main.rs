@@ -37,7 +37,7 @@ fn try_main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             if let Ok(event) = menu_event_receiver.try_recv() {
                 match event.id {
                     id if id == my_menu_id.test_notification => {
-                        show_notification("Test Notification\nThis is a test message.")
+                        show_notification("Test Notification\nThis is a test message.")?;
                     }
                     id if id == my_menu_id.exit => WindowsAndMessaging::PostQuitMessage(0),
                     _ => {
@@ -77,14 +77,14 @@ fn handle_server(
         let message = std::str::from_utf8(&buffer)?
             .trim_end_matches('\0')
             .trim_end();
-        show_notification(message);
+        show_notification(message)?;
         dbg!("Connection closed");
     }
     dbg!("Server stopped");
     Ok(())
 }
 
-fn show_notification(message: &str) {
+fn show_notification(message: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use winrt_toast::{Scenario, Toast, ToastManager};
 
     // applicationid に PowerShell を指定すると、Toastをクリックしてもウィンドウが開かれない
@@ -106,7 +106,7 @@ fn show_notification(message: &str) {
         }
     }
 
-    manager.show(&toast).expect("Failed to show toast");
+    manager.show(&toast).map_err(Into::into)
 }
 
 fn post_quit_message_to_thread(thread_id: u32) {
