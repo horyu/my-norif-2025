@@ -14,8 +14,6 @@ fn main() {
 }
 
 fn try_main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use windows::Win32::UI::WindowsAndMessaging;
-
     let local_ip_address = local_ip_address::local_ip()?;
     let port = get_port()?;
     dbg!(local_ip_address, port);
@@ -30,24 +28,7 @@ fn try_main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         result
     });
 
-    let mut message = WindowsAndMessaging::MSG::default();
-    let menu_event_receiver = tray_icon::menu::MenuEvent::receiver();
-    unsafe {
-        while WindowsAndMessaging::GetMessageW(&mut message, None, 0, 0).as_bool() {
-            if let Ok(event) = menu_event_receiver.try_recv() {
-                match event.id {
-                    id if id == my_menu_id.test_notification => {
-                        show_notification("Test Notification\nThis is a test message.")?;
-                    }
-                    id if id == my_menu_id.exit => WindowsAndMessaging::PostQuitMessage(0),
-                    _ => {
-                        return Err(format!("Unknown menu event: {event:#?}").into());
-                    }
-                }
-            }
-            WindowsAndMessaging::DispatchMessageW(&message);
-        }
-    }
+    process_message_loop(my_menu_id)?;
 
     if join_handle.is_finished() {
         join_handle
@@ -56,6 +37,31 @@ fn try_main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     } else {
         Ok(())
     }
+}
+
+fn process_message_loop(
+    my_menu_id: MyMenuId,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use windows::Win32::UI::WindowsAndMessaging;
+
+    let mut message = WindowsAndMessaging::MSG::default();
+    let menu_event_receiver = tray_icon::menu::MenuEvent::receiver();
+
+    unsafe {
+        while WindowsAndMessaging::GetMessageW(&mut message, None, 0, 0).as_bool() {
+            if let Ok(event) = menu_event_receiver.try_recv() {
+                match event.id {
+                    id if id == my_menu_id.test_notification => {
+                        show_notification("Test Notification\nThis is a test message.")?;
+                    }
+                    id if id == my_menu_id.exit => WindowsAndMessaging::PostQuitMessage(0),
+                    _ => return Err(format!("Unknown menu event: {event:#?}").into()),
+                }
+            }
+            WindowsAndMessaging::DispatchMessageW(&message);
+        }
+    }
+    Ok(())
 }
 
 fn handle_server(
