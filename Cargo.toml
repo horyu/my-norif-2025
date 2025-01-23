@@ -18,3 +18,4 @@ features = [
 
 [build-dependencies]
 image = "0.25.5"
+winres = "0.1"
