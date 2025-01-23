@@ -8,7 +8,8 @@ struct MyMenuId {
 
 fn main() {
     if let Err(err) = try_main() {
-        dbg!(err);
+        dbg!(&err);
+        handle_error(err);
         std::process::exit(1);
     }
 }
@@ -170,4 +171,38 @@ fn create_tray_icon(
         .build()?;
 
     Ok((tray_icon, menu_id))
+}
+
+fn handle_error(err: Box<dyn std::error::Error + Send + Sync>) {
+    use rfd::{FileDialog, MessageButtons, MessageDialog, MessageDialogResult, MessageLevel};
+    use std::{fs::File, io::Write};
+
+    if MessageDialogResult::Yes
+        != MessageDialog::new()
+            .set_title("My Notif")
+            .set_level(MessageLevel::Error)
+            .set_buttons(MessageButtons::YesNo)
+            .set_description(
+                "An error occurred. Would you like to save the error details to a file?",
+            )
+            .show()
+    {
+        return;
+    }
+
+    let Some(file_path) = FileDialog::new()
+        .set_title("MyNotif Error Log")
+        .add_filter("Log File", &["log"])
+        .save_file()
+    else {
+        return;
+    };
+
+    if let Err(e) = File::create(file_path).and_then(|mut file| writeln!(file, "{err:#?}")) {
+        MessageDialog::new()
+            .set_title("My Notif")
+            .set_level(MessageLevel::Error)
+            .set_description(format!("Failed to save the error details.\n{e:#?}"))
+            .show();
+    }
 }
