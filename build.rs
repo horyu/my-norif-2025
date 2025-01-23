@@ -8,15 +8,29 @@ use std::{
     path::Path,
 };
 
-const SOURCE_ICON: &str = "icon.png";
+const SOURCE_ICON: &str = "img/icon.png";
+const DEST_ICO: &str = "img/icon.ico";
 const DEST_ICON_DATA: &str = "src/icon_data.rs";
-const DEST_ICO: &str = "icon.ico";
 
 fn main() -> Result<(), std::io::Error> {
-    generate_icon_data();
     generate_ico_file();
+    generate_icon_data();
 
     winres::WindowsResource::new().set_icon(DEST_ICO).compile()
+}
+
+fn generate_ico_file() {
+    let src_path = Path::new(SOURCE_ICON);
+    let dest_path = Path::new(DEST_ICO);
+
+    if should_regenerate_file(src_path, dest_path) {
+        let img = ImageReader::open(src_path)
+            .expect("Failed to open icon.png")
+            .decode()
+            .expect("Failed to decode icon.png");
+
+        img.save(dest_path).expect("Failed to save icon.ico");
+    }
 }
 
 fn generate_icon_data() {
@@ -39,20 +53,6 @@ fn generate_icon_data() {
             "#![cfg_attr(any(), rustfmt::skip)]\npub const ICON_WIDTH: u32 = {};\npub const ICON_HEIGHT: u32 = {};\npub const ICON_RGBA: &[u8] = &{:?};",
             width, height, rgba
         ).expect("Failed to write to file");
-    }
-}
-
-fn generate_ico_file() {
-    let src_path = Path::new(SOURCE_ICON);
-    let dest_path = Path::new(DEST_ICO);
-
-    if should_regenerate_file(src_path, dest_path) {
-        let img = ImageReader::open(src_path)
-            .expect("Failed to open icon.png")
-            .decode()
-            .expect("Failed to decode icon.png");
-
-        img.save(dest_path).expect("Failed to save icon.ico");
     }
 }
 
