@@ -2,75 +2,40 @@
 compile_error!("only windows is supported");
 
 use image::ImageReader;
-use std::{
-    fs::{File, metadata},
-    io::Write,
-    path::Path,
-};
-
-const SOURCE_ICON: &str = "img/icon.png";
-const DEST_ICO: &str = "img/icon.ico";
-const DEST_ICON_DATA: &str = "src/icon_data.rs";
+use std::{env, ffi::OsString, fs::File, io::Write, path::Path};
 
 fn main() -> Result<(), std::io::Error> {
-    generate_ico_file();
-    generate_icon_data();
+    println!("cargo::rerun-if-changed=icon.png");
 
-    winres::WindowsResource::new().set_icon(DEST_ICO).compile()
+    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let img = ImageReader::open("icon.png")
+        .expect("Failed to open icon.png")
+        .decode()
+        .expect("Failed to decode icon.png");
+    generate_ico_file(&out_dir, &img);
+    generate_icon_data(&out_dir, &img);
+
+    winres::WindowsResource::new()
+        .set_icon("icon.ico")
+        .compile()
 }
 
-fn generate_ico_file() {
-    let src_path = Path::new(SOURCE_ICON);
-    let dest_path = Path::new(DEST_ICO);
-
-    if should_regenerate_file(src_path, dest_path) {
-        let img = ImageReader::open(src_path)
-            .expect("Failed to open icon.png")
-            .decode()
-            .expect("Failed to decode icon.png");
-
-        img.save(dest_path).expect("Failed to save icon.ico");
-    }
+fn generate_ico_file(out_dir: &OsString, img: &image::DynamicImage) {
+    let dest_path = Path::new(out_dir).join("icon.ico");
+    img.save(dest_path).expect("Failed to save icon.ico");
 }
 
-fn generate_icon_data() {
-    let src_path = Path::new(SOURCE_ICON);
-    let dest_path = Path::new(DEST_ICON_DATA);
+fn generate_icon_data(out_dir: &OsString, img: &image::DynamicImage) {
+    let dest_path = Path::new(&out_dir).join("icon_data.rs");
 
-    if should_regenerate_file(src_path, dest_path) {
-        let img = ImageReader::open(src_path)
-            .expect("Failed to open icon.png")
-            .decode()
-            .expect("Failed to decode icon.png");
+    let height = img.height();
+    let width = img.width();
+    let rgba = img.to_rgba8().into_raw();
 
-        let height = img.height();
-        let width = img.width();
-        let rgba = img.into_rgba8().into_raw();
-
-        let mut file = File::create(dest_path).expect("Failed to create file");
-        write!(
-            file,
-            "#![cfg_attr(any(), rustfmt::skip)]\npub const ICON_WIDTH: u32 = {};\npub const ICON_HEIGHT: u32 = {};\npub const ICON_RGBA: &[u8] = &{:?};",
-            width, height, rgba
-        ).expect("Failed to write to file");
-    }
-}
-
-fn should_regenerate_file(src_path: &Path, dest_path: &Path) -> bool {
-    let src_metadata =
-        metadata(src_path).unwrap_or_else(|_| panic!("Failed to get metadata for {src_path:?}"));
-    let dest_metadata = metadata(dest_path).ok();
-
-    match dest_metadata {
-        Some(dest_metadata) => {
-            let src_modified = src_metadata
-                .modified()
-                .unwrap_or_else(|_| panic!("Failed to get modification time for {src_path:?}"));
-            let dest_modified = dest_metadata
-                .modified()
-                .unwrap_or_else(|_| panic!("Failed to get modification time for {dest_path:?}"));
-            dest_modified < src_modified
-        }
-        None => true,
-    }
+    let mut file = File::create(dest_path).expect("Failed to create file icon_data.rs");
+    write!(
+        file,
+        "const ICON_WIDTH: u32 = {};\nconst ICON_HEIGHT: u32 = {};\nconst ICON_RGBA: &[u8] = &{:?};",
+        width, height, rgba
+    ).expect("Failed to write to file");
 }

@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod icon_data;
+include!(concat!(env!("OUT_DIR"), "/icon_data.rs"));
 
 #[derive(Debug)]
 struct MyMenuId {
@@ -159,11 +159,7 @@ fn create_tray_icon(
         exit: exit.id().0.to_owned(),
     };
 
-    let icon = Icon::from_rgba(
-        icon_data::ICON_RGBA.to_vec(),
-        icon_data::ICON_WIDTH,
-        icon_data::ICON_HEIGHT,
-    )?;
+    let icon = Icon::from_rgba(ICON_RGBA.to_vec(), ICON_WIDTH, ICON_HEIGHT)?;
 
     let tray_icon = TrayIconBuilder::new()
         .with_tooltip(format!("My Notif\nIP: {ip}\nPort: {port}"))
