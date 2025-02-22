@@ -19,3 +19,11 @@ features = [
 [build-dependencies]
 image = "0.25.5"
 winres = "0.1"
+
+[package.metadata.winres]
+OriginalFilename = "my-norif-2025.exe"
+ProductName = "my-norif-2025"
+LegalCopyright = "Copyright (C) 2025 horyu"
+ProductVersion = "0.1.0.0"
+FileVersion = "0.1.0.0"
+FileDescription = "https://github.com/horyu/my-norif-2025/blob/master/README.md"
